@@ -174,7 +174,6 @@ countBamInGRanges.exomeDepth <- function (bam.file, index = bam.file, granges, m
 #####  second check for consistency between BAM and target regions
   if (sum(! seqs.in.target %in% seqs.in.bam.file)) {  ### if some sequences are missing
     print("Problematic sequences:")
-    print(seqs.in.bam.file)
     print( seqs.in.target [ ! seqs.in.target %in% seqs.in.bam.file ])
     stop("Some sequences in the target data frame cannot be found in the index of the BAM file")
   }
@@ -195,7 +194,7 @@ countBamInGRanges.exomeDepth <- function (bam.file, index = bam.file, granges, m
                                               what = c("mapq", "pos", "isize"), which = target.local1)
     gal <- GenomicAlignments::readGAlignments(file = bam.file, index = index, param = my.param.pairs)
     if (length(gal) > 0) {
-      gal <- methods::as(gal, 'data.frame')
+      gal <- as(gal, 'data.frame')
       gal <- gal[ gal$mapq > min.mapq & gal$isize > 0, ]
 
       gal <- GenomicRanges::GRanges( seqnames = gal$seqnames,
@@ -209,7 +208,7 @@ countBamInGRanges.exomeDepth <- function (bam.file, index = bam.file, granges, m
     gal.single <- GenomicAlignments::readGAlignments(file = bam.file, index = index, param = my.param.single)
     if (length(gal.single) > 0) {
       message('Some single end reads detected in this BAM file')
-      gal.single <- methods::as(gal.single, 'data.frame')
+      gal.single <- as(gal.single, 'data.frame')
       gal.single <- gal.single[ gal.single$mapq > min.mapq,  ]
 
       gal.single <- GenomicRanges::GRanges( seqnames = gal.single$seqnames,
@@ -300,8 +299,11 @@ getBamCounts <- function(bed.frame = NULL, bed.file = NULL, bam.files, index.fil
   target <- GenomicRanges::GRanges(seqnames = bed.frame$seqnames,
                     IRanges::IRanges(start=bed.frame$start+1,end=bed.frame$end))
 
+  rdata <- IRanges::RangedData(space= GenomicRanges::seqnames(target),
+                               ranges=GenomicRanges::ranges(target))
+
   if  ((ncol(bed.frame) >= 4) && (class(bed.frame[,4]) %in% c('character', 'factor'))) {
-      GenomicRanges::values(target) <- cbind(GenomicRanges::values(target), data.frame(exon = as.character(bed.frame[,4]),stringsAsFactors = FALSE))
+    row.names(rdata) <- make.unique(as.character(bed.frame[,4]))  ##add exon names if available
   }
 
 ############################################################################# add GC content
@@ -314,8 +316,8 @@ if (!is.null(referenceFasta)) {
       all.count <- Biostrings::letterFrequency(x,"ATGC")
       as.vector(ifelse(all.count==0,NA,GC.count/all.count))
     }
-  GenomicRanges::values(target) <- cbind(GenomicRanges::values(target), data.frame(GC = getGCcontent(target.dnastringset)))
-}
+    rdata[["GC"]] <- getGCcontent(target.dnastringset)
+  }
 
 ############################################################################# Parse BAM files
   nfiles <- length(bam.files)
@@ -327,20 +329,15 @@ if (!is.null(referenceFasta)) {
                                       what = c("mapq", "pos", "isize"), )
 
 
-  exon_count_frame <- dplyr::tibble(chromosome = as(GenomicRanges::seqnames(target), 'character'),
-                                    start = as(GenomicRanges::start(target), 'numeric'),
-                                    end = as(GenomicRanges::end(target), 'numeric'))
-  exon_count_frame <- dplyr::bind_cols(exon_count_frame, as(GenomicRanges::values(target), 'data.frame'))
-
+  
   for (i in 1:nfiles) {
     bam <- bam.files[ i ]
     index <- index.files[ i ]
-    exon_count_frame[[ basename(bam) ]] <- countBamInGRanges.exomeDepth ( bam.file = bam, index = index, granges = target, min.mapq = min.mapq, read.width = read.width)
-    message("Number of counted fragments : ", sum(exon_count_frame[[ basename(bam) ]]))
+    rdata[[ basename(bam) ]] <- countBamInGRanges.exomeDepth ( bam.file = bam, index = index, granges = target, min.mapq = min.mapq, read.width = read.width)
+    message("Number of counted fragments : ", sum(rdata[[ basename(bam) ]]))
   }
 
-
-  return(data.frame(exon_count_frame))
+  return(rdata)
 }
 
 
@@ -418,25 +415,25 @@ count.everted.reads <- function(bed.frame = NULL,
 
   target <- GenomicRanges::GRanges(seqnames = bed.frame$seqnames,
                     IRanges::IRanges(start=bed.frame$start+1,end=bed.frame$end))
+  rdata <- IRanges::RangedData(space=GenomicRanges::seqnames(target),
+                               ranges=GenomicRanges::ranges(target))
 
   if  ((ncol(bed.frame) >= 4) && (class(bed.frame[,4]) %in% c('character', 'factor'))) {
-    GenomicRanges::values(target) <- cbind(GenomicRanges::values(target), data.frame(exon = as.character(bed.frame[,4]),stringsAsFactors = FALSE))
+    row.names(rdata) <- make.unique(as.character(bed.frame[,4]))  ##add exon names if available
   }
-
-  exon_count_frame <- dplyr::tibble(chromosome = as(GenomicRanges::seqnames(target), 'character'),
-                                    start = as(GenomicRanges::start(target), 'numeric'),
-                                    end = as(GenomicRanges::end(target), 'numeric'))
-  exon_count_frame <- dplyr::bind_cols(exon_count_frame, as(GenomicRanges::values(target), 'data.frame'))
 
   nfiles <- length(bam.files)
   for (i in 1:nfiles) {
     bam <- bam.files[ i ]
     index <- index.files[ i ]
-    exon_count_frame[[ basename(bam) ]] <- countBam.everted (bam.file = bam,  ## replace old RangedData with GRanges
+
+    rdata[[ basename(bam) ]] <- countBam.everted (bam.file = bam,
                                                   index = index,
                                                   granges = target,
                                                   min.mapq = min.mapq)
-   }
+  }
 
-  return(data.frame(exon_count_frame))
+  rdata <- as.data.frame(rdata)
+  names(rdata)[[1]] <- 'chromosome'
+  return (rdata)
 }
