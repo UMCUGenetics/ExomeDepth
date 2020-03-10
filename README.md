@@ -1,3 +1,37 @@
+## UMCU fork of ExomeDepth, with additional changes
+## Version named v2.0.0. as it is possibly backwards incompatible with previous versions.
+
+
+## Build instruction
+# Tested for R 3.5.1
+
+``` bash
+make build 
+```
+
+# Install R dependicies
+
+##Dependencies
+``` R
+install.packages("path/to/install.tar.gz" ,lib='path/to/lib')
+```
+
+#Bioconductor dependencies:
+``` R
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install(c("Biostrings","Rsamtools","GenomicRanges","VGAM","zlibbioc","bitops","BiocGenerics","BiocParallel","S4Vectors","IRanges","GenomeInfoDb","RCurl","GenomeInfoDbData","XVector","GenomicAlignments","Biobase","DelayedArray","matrixStats","Matrix","lattice","aod","stringr","stringi","dplyr","rlang","Rcpp","assertthat","glue","pkgconfig","tibble","pillar","crayon","vctrs","tidyselect","purrr","SummarizedExperiment","R6"), lib='path/to/lib')
+```
+
+#Other dependencies:
+``` R
+install.packages('magrittr', lib='path/to/lib')
+```
+
+
+
+############### Original README
 # What ExomeDepth does
 
 ExomeDepth is a R package designed to detect inherited copy number variants (CNVs) using high throughput DNA sequence data.
