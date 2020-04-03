@@ -52,10 +52,9 @@ select.reference.set <- function(test.counts, reference.counts, bin.length = NUL
   
 
   
-  if (!is.matrix(reference.counts)) stop('The reference sequence count data must be provided as a matrix')
+  if (class(reference.counts) != 'matrix') stop('The reference sequence count data must be provided as a matrix')
   if (nrow(reference.counts) != length(test.counts)) stop("The number of rows of the reference matrix must match the length of the test count data\n")
   if (is.null(bin.length)) bin.length <- rep(1, length(test.counts))
-  
   
   n.ref.samples <- ncol(reference.counts)
 
@@ -71,9 +70,6 @@ select.reference.set <- function(test.counts, reference.counts, bin.length = NUL
 
 
   test.counts <- test.counts[ selected ]
-  #print(selected)
-
-
 
   reference.counts <- reference.counts[ selected, , drop = FALSE ]
   bin.length <- bin.length[ selected]
@@ -96,6 +92,9 @@ select.reference.set <- function(test.counts, reference.counts, bin.length = NUL
                                mean.p = NA,
                                median.depth = NA,
                                selected = FALSE)
+
+  res.data.frame <- res.data.frame[which(res.data.frame$correlations < 1), ]  # ME added to exclude self-self
+  n.ref.samples<-nrow(res.data.frame)   # ME added to set number of samples correct after removal of possible self-self
 
   reference <- rep(0, n.bins)
   for (i in 1:n.ref.samples) {
@@ -128,8 +127,17 @@ select.reference.set <- function(test.counts, reference.counts, bin.length = NUL
   }
 
   my.max <- which.max( res.data.frame$expected.BF )
+  ## ME select minimum reference set of 7 samples
+  if (my.max<7) {
+    my.max <- 7
+  }
+
   res.data.frame$selected[ my.max ] <- TRUE
   my.res <- list(reference.choice = as.character(res.data.frame$ref.samples[ 1:my.max ]), summary.stats = res.data.frame)
-                 
+  print("\n##################\nNumber of selected reference samples=")
+  print(length(my.res))
+  print("\nSelected reference samples=")
+  print(my.res)
+  print ("##################\n")
   return(my.res)
 }

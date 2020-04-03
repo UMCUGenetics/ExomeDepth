@@ -33,7 +33,9 @@ setClass("ExomeDepth",
                         phi = "numeric",
                         likelihood = "matrix",
                         annotations = "data.frame",
-                        CNV.calls = "data.frame"))
+                        CNV.calls = "data.frame",
+                        refcorrelation = "numeric"
+                        ))
 
 
 
@@ -263,6 +265,8 @@ setMethod("CallCNVs", "ExomeDepth", function( x, chromosome, start, end, name, t
   message('Correlation between reference and tests count is ', signif(cor.test.reference, 5))
   message('To get meaningful result, this correlation should really be above 0.97. If this is not the case, consider the output of ExomeDepth as less reliable (i.e. most likely a high false positive rate)')
 
+  x@refcorrelation<-signif(cor.test.reference, 5)
+
   total <- x@test + x@reference
   transitions <- matrix(nrow = 3, ncol = 3,
                         c( 1. - transition.probability, transition.probability/2., transition.probability/2.,
@@ -291,7 +295,7 @@ setMethod("CallCNVs", "ExomeDepth", function( x, chromosome, start, end, name, t
                              positions = as.integer(c(positions[1] - 2*expected.CNV.length, positions,end.positions[length(end.positions)]+2*expected.CNV.length)),   #include position of new dummy exon
                              expected.CNV.length = expected.CNV.length)
 
-    my.calls$calls$start.p <- my.calls$calls$start.p -1  ##remove the dummy exon, which has now served its purpose
+    my.calls$calls$start.p <- my.calls$calls$end.p - my.calls$calls$nexons  #ME Fixed issue #19 as decribed in GitHub repo
     my.calls$calls$end.p <- my.calls$calls$end.p -1  ##remove the dummy exon, which has now served its purpose
     #loc.likelihood <- loc.likelihood[ -1, c(2,1, 3) ]  ##remove the dummy exon, which has now served its purpose
     loc.likelihood <- loc.likelihood[ -c(1,nrow(loc.likelihood)), c(2,1, 3), drop = FALSE ] ##remove both of the dummy exons, which have now served their purpose
@@ -383,6 +387,39 @@ somatic.CNV.call <- function(normal, tumor, prop.tumor = 1, chromosome, start, e
 }
 
 
+setGeneric("AnnotateExtra", def = function(x, reference.annotation, min.overlap = 0.5, column.name = 'overlap') standardGeneric('AnnotateExtra'))
+
+
+setMethod("AnnotateExtra", "ExomeDepth", function( x, reference.annotation, min.overlap, column.name) {
+
+  my.calls.GRanges <- GenomicRanges::GRanges(seqnames = factor(x@CNV.calls$chromosome),
+                              IRanges::IRanges(start=x@CNV.calls$start,end= x@CNV.calls$end))
+  ##browser()
+  test <- GenomicRanges::findOverlaps(query = my.calls.GRanges, subject = reference.annotation)
+  test <- data.frame(calls = test@from, ref = test@to)
+
+
+  ###add info about the CNV calls
+  test$call.start <- x@CNV.calls$start[ test$calls ]
+  test$call.end <- x@CNV.calls$end[ test$calls ]
+  test$chromosome.end <- x@CNV.calls$chromosome[ test$calls ]
+
+  ## info about the reference calls
+  test$callsref.start <- GenomicRanges::start(reference.annotation) [ test$ref ]
+  test$callsref.end<- GenomicRanges::end(reference.annotation) [ test$ref ]
+
+  ### estimate the overlap
+  test$overlap <- pmin (test$callsref.end, test$call.end) -  pmax( test$call.start, test$callsref.start)
+  test <- test [test$overlap > min.overlap*(test$call.end - test$call.start), ]
+
+  my.split <-  split(as.character(GenomicRanges::elementMetadata(reference.annotation)$names)[ test$ref], f = test$calls)
+  my.overlap.frame <- data.frame(call = names(my.split),  target = sapply(my.split, FUN = paste, collapse = ','))
+  my.overlap.frame <- data.frame(call = names(my.split),  target = sapply(my.split, FUN = paste, collapse = ','))
+
+
+  x@CNV.calls[, column.name] <- as.character(my.overlap.frame$target)[ match(1:nrow(x@CNV.calls), table = my.overlap.frame$call) ]
+  return(x)
+})
 
 
 
