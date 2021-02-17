@@ -1,5 +1,5 @@
 ## UMCU fork of ExomeDepth, with additional changes
-## Version named v2.0.0. as it is possibly backwards incompatible with previous versions.
+## Version named v2 as it is possibly backwards incompatible with previous versions.
 
 
 ## Build instruction
