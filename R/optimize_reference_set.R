@@ -93,7 +93,7 @@ select.reference.set <- function(test.counts, reference.counts, bin.length = NUL
                                median.depth = NA,
                                selected = FALSE)
 
-  res.data.frame <- res.data.frame[which(res.data.frame$correlations < 1), ]  # ME added to exclude self-self
+  res.data.frame <- res.data.frame[which(res.data.frame$correlations < 0.99), ]  # ME added to exclude self-self
   n.ref.samples<-nrow(res.data.frame)   # ME added to set number of samples correct after removal of possible self-self
 
   reference <- rep(0, n.bins)
